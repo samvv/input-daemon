@@ -1,0 +1,20 @@
+[package]
+name = "input-daemon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.39", features = ["cargo", "derive"] }
+evdev = { version = "0.13.1", optional = true }
+thiserror = "2.0.12"
+tokio = { version = "1.45.1", features = ["full"] }
+zbus = { version = "5.7.1", features = [
+    "tokio",
+], default-features = false, optional = true }
+zbus_polkit = "5.0.0"
+
+[features]
+default = ["client", "server"]
+server = ["dep:zbus", "dep:evdev"]
+client = ["dep:zbus"]
