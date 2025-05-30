@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
+"http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
+<policyconfig>
+  <vendor>InputDaemon</vendor>
+  <vendor_url>https://github.com/samvv/input-daemon/</vendor_url>
+  <!-- <icon_name>nm-icon</icon_name> -->
+  <action id="be.samvervaeck.InputDaemon.send">
+    <description>Send input events to the kernel</description>
+    <message>An application requests to send mouse and keyboard input</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=be.samvervaeck.InputDaemon
+User=root
+Exec=/usr/bin/input-daemon
