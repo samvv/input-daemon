@@ -57,18 +57,23 @@ macro_rules! unwrap_or_return {
     };
 }
 
-#[interface(name = "be.samvervaeck.InputDaemon.Events")]
+macro_rules! unwrap_or_return_false {
+    ($expr:expr) => {
+        match $expr {
+            Ok(value) => value,
+            Err(error) => {
+                log::warn!("{}", error);
+                return false;
+            }
+        }
+    };
+}
+
 impl Service {
-    async fn send_key(
-        &mut self,
-        #[zbus(header)] header: Header<'_>,
-        #[zbus(connection)] conn: &Connection,
-        code: u32,
-        state: i32,
-    ) {
-        let proxy = unwrap_or_return!(AuthorityProxy::new(&conn).await);
-        let subject = unwrap_or_return!(Subject::new_for_message_header(&header));
-        let result = unwrap_or_return!(
+    async fn is_authorized(&mut self, conn: &Connection, header: &Header<'_>) -> bool {
+        let proxy = unwrap_or_return_false!(AuthorityProxy::new(&conn).await);
+        let subject = unwrap_or_return_false!(Subject::new_for_message_header(&header));
+        let result = unwrap_or_return_false!(
             proxy
                 .check_authorization(
                     &subject,
@@ -79,19 +84,51 @@ impl Service {
                 )
                 .await
         );
-        if !result.is_authorized {
+        result.is_authorized
+    }
+}
+
+#[interface(name = "be.samvervaeck.InputDaemon.Events")]
+impl Service {
+    async fn send_key(
+        &mut self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        code: u32,
+        state: i32,
+    ) {
+        if !self.is_authorized(conn, &header).await {
             return;
         }
         let code = unwrap_or_return!(code.try_into());
         unwrap_or_return!(self.dev.emit(&[*KeyEvent::new(KeyCode(code), state)]));
     }
-    fn send_wheel(&mut self, vertical: i32, horizontal: i32) {
+    async fn send_wheel(
+        &mut self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        vertical: i32,
+        horizontal: i32,
+    ) {
+        if !self.is_authorized(conn, &header).await {
+            return;
+        }
         unwrap_or_return!(self.dev.emit(&[
             *RelativeAxisEvent::new(RelativeAxisCode::REL_WHEEL, vertical),
             *RelativeAxisEvent::new(RelativeAxisCode::REL_HWHEEL, horizontal),
         ]));
     }
-    fn send_motion(&mut self, x: i32, y: i32, z: i32) {
+    async fn send_motion(
+        &mut self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) {
+        if !self.is_authorized(conn, &header).await {
+            return;
+        }
         unwrap_or_return!(self.dev.emit(&[
             *RelativeAxisEvent::new(RelativeAxisCode::REL_X, x),
             *RelativeAxisEvent::new(RelativeAxisCode::REL_Y, y),
