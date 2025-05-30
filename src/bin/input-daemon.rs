@@ -4,6 +4,7 @@ use input_daemon::server::Service;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let service = Service::new()?;
     let _conn = zbus::connection::Builder::system()?
         .name("be.samvervaeck.InputDaemon")?

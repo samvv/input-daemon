@@ -3,7 +3,8 @@ use thiserror::Error;
 use evdev::{
     AttributeSet, KeyCode, KeyEvent, RelativeAxisCode, RelativeAxisEvent, uinput::VirtualDevice,
 };
-use zbus::{Connection, interface};
+use zbus::{Connection, interface, message::Header};
+use zbus_polkit::policykit1::{AuthorityProxy, CheckAuthorizationFlags, Subject};
 
 pub struct Service {
     dev: VirtualDevice,
@@ -44,33 +45,58 @@ impl Service {
     }
 }
 
+macro_rules! unwrap_or_return {
+    ($expr:expr) => {
+        match $expr {
+            Ok(value) => value,
+            Err(error) => {
+                log::warn!("{}", error);
+                return;
+            }
+        }
+    };
+}
+
 #[interface(name = "be.samvervaeck.InputDaemon.Events")]
 impl Service {
-    fn send_key(&mut self, code: u32, state: i32) -> bool {
-        let code = match code.try_into() {
-            Ok(code) => code,
-            _ => return false,
-        };
-        self.dev
-            .emit(&[*KeyEvent::new(KeyCode(code), state)])
-            .is_ok()
+    async fn send_key(
+        &mut self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        code: u32,
+        state: i32,
+    ) {
+        let proxy = unwrap_or_return!(AuthorityProxy::new(&conn).await);
+        let subject = unwrap_or_return!(Subject::new_for_message_header(&header));
+        let result = unwrap_or_return!(
+            proxy
+                .check_authorization(
+                    &subject,
+                    "be.samvervaeck.InputDaemon.send",
+                    &std::collections::HashMap::new(),
+                    CheckAuthorizationFlags::AllowUserInteraction.into(),
+                    ""
+                )
+                .await
+        );
+        if !result.is_authorized {
+            return;
+        }
+        let code = unwrap_or_return!(code.try_into());
+        unwrap_or_return!(self.dev.emit(&[*KeyEvent::new(KeyCode(code), state)]));
     }
-    fn send_wheel(&mut self, vertical: i32, horizontal: i32) -> bool {
-        self.dev
-            .emit(&[
-                *RelativeAxisEvent::new(RelativeAxisCode::REL_WHEEL, vertical),
-                *RelativeAxisEvent::new(RelativeAxisCode::REL_HWHEEL, horizontal),
-            ])
-            .is_ok()
+    fn send_wheel(&mut self, vertical: i32, horizontal: i32) {
+        unwrap_or_return!(self.dev.emit(&[
+            *RelativeAxisEvent::new(RelativeAxisCode::REL_WHEEL, vertical),
+            *RelativeAxisEvent::new(RelativeAxisCode::REL_HWHEEL, horizontal),
+        ]));
     }
-    fn send_motion(&mut self, x: i32, y: i32, z: i32) -> bool {
-        self.dev
-            .emit(&[
-                *RelativeAxisEvent::new(RelativeAxisCode::REL_X, x),
-                *RelativeAxisEvent::new(RelativeAxisCode::REL_Y, y),
-                *RelativeAxisEvent::new(RelativeAxisCode::REL_Z, z),
-            ])
-            .is_ok()
+    fn send_motion(&mut self, x: i32, y: i32, z: i32) {
+        unwrap_or_return!(self.dev.emit(&[
+            *RelativeAxisEvent::new(RelativeAxisCode::REL_X, x),
+            *RelativeAxisEvent::new(RelativeAxisCode::REL_Y, y),
+            *RelativeAxisEvent::new(RelativeAxisCode::REL_Z, z),
+        ]));
     }
 }
 
