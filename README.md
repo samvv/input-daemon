@@ -2,7 +2,8 @@ InputDaemon
 ===========
 
 InputDaemon is a service that runs as the `root` user and allows user-space
-applications to control input devices such as a mouse or a keyboard.
+applications to control input devices such as a mouse or a keyboard in a secure
+way.
 
 **Why?**
 
